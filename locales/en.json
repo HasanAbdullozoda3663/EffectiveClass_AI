@@ -1,0 +1,130 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About Project",
+    "getStarted": "Get Started"
+  },
+  "hero": {
+    "title": "Transforming Classrooms with AI",
+    "subtitle": "Analyze, Improve, and Enhance Learning in Real-Time",
+    "cta": "Get Started"
+  },
+  "sections": {
+    "whyTitle": "Why EffectiveClass AI?",
+    "whyCards": [
+      {
+        "title": "AI-Powered Analysis",
+        "description": "Advanced algorithms analyze teaching methods and student engagement in real-time"
+      },
+      {
+        "title": "Multilingual Support",
+        "description": "Generate reports in Tajik, Russian, and English for global accessibility"
+      },
+      {
+        "title": "Professional Feedback",
+        "description": "Detailed insights and recommendations for teaching improvement"
+      },
+      {
+        "title": "Easy Integration",
+        "description": "Simple upload process with comprehensive analysis results"
+      }
+    ],
+    "metricsTitle": "Proven Results",
+    "metricsSubtitle": "See the impact of AI-powered classroom analysis",
+    "effectivenessTitle": "Effectiveness of Class with EffectiveClass AI",
+    "effectivenessSubtitle": "Dramatic improvements in key educational metrics",
+    "beforeAI": "Before AI",
+    "afterAI": "After AI",
+    "studentEngagement": "Student Engagement",
+    "lessonClarity": "Lesson Clarity",
+    "participation": "Participation",
+    "howTitle": "How It Helps",
+    "howCards": [
+      {
+        "title": "Teaching Quality",
+        "description": "Evaluate and improve instructional methods"
+      },
+      {
+        "title": "Student Engagement",
+        "description": "Track participation and attention levels"
+      },
+      {
+        "title": "Learning Outcomes",
+        "description": "Measure and enhance educational effectiveness"
+      }
+    ],
+    "whereTitle": "Where It Can Be Used",
+    "whereCards": [
+      {
+        "title": "Schools",
+        "description": "Primary and secondary education institutions"
+      },
+      {
+        "title": "Universities",
+        "description": "Higher education and research facilities"
+      },
+      {
+        "title": "NGOs",
+        "description": "Educational non-profit organizations"
+      },
+      {
+        "title": "Government",
+        "description": "Public education departments"
+      }
+    ]
+  },
+  "about": {
+    "title": "About EffectiveClass AI",
+    "subtitle": "Revolutionizing education through intelligent classroom analysis",
+    "description": "Our platform combines cutting-edge AI technology with educational expertise to provide comprehensive classroom analysis and feedback.",
+    "processTitle": "How It Works",
+    "processSteps": [
+      {
+        "title": "Upload Video",
+        "description": "Upload your classroom recording securely"
+      },
+      {
+        "title": "AI Analysis",
+        "description": "Our AI analyzes teaching methods and student behavior"
+      },
+      {
+        "title": "Generate Transcript",
+        "description": "Automatic transcription in multiple languages"
+      },
+      {
+        "title": "Create Report",
+        "description": "Comprehensive feedback and recommendations"
+      },
+      {
+        "title": "Deliver Insights",
+        "description": "Professional multilingual reports delivered"
+      }
+    ]
+  },
+  "getStarted": {
+    "title": "Get Started with EffectiveClass AI",
+    "subtitle": "Upload your classroom video and receive professional AI-powered feedback",
+    "form": {
+      "videoFile": "Video File",
+      "subject": "Subject",
+      "lessonTheme": "Lesson Theme",
+      "videoLanguage": "Video Language",
+      "feedbackLanguage": "Feedback Language",
+      "upload": "Upload & Analyze",
+      "dragDrop": "Drag & drop your video file here, or click to browse",
+      "processing": "Processing your video...",
+      "success": "Analysis complete! Your feedback report is ready."
+    },
+    "languages": {
+      "tajik": "Tajik",
+      "russian": "Russian",
+      "english": "English"
+    }
+  },
+  "footer": {
+    "description": "Transforming education through AI-powered classroom analysis",
+    "links": "Quick Links",
+    "contact": "Contact",
+    "social": "Follow Us"
+  }
+}
