@@ -12,7 +12,26 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/language-context"
 import { DeviceMockup } from "@/components/device-mockups"
-import { Upload, FileVideo, CheckCircle, Loader2, Play, BarChart3, FileText, Download } from "lucide-react"
+import { Upload, FileVideo, CheckCircle, Loader2, Play, BarChart3, FileText, Download, AlertCircle } from "lucide-react"
+import { apiService, ProcessingStatusResponse, GetFeedbackResponse } from "@/lib/api"
+import { toast } from "sonner"
+
+// Subject options that match backend enum
+const SUBJECT_OPTIONS = [
+  { value: "mathematics", label: "Mathematics" },
+  { value: "physics", label: "Physics" },
+  { value: "chemistry", label: "Chemistry" },
+  { value: "biology", label: "Biology" },
+  { value: "history", label: "History" },
+  { value: "geography", label: "Geography" },
+  { value: "literature", label: "Literature" },
+  { value: "language", label: "Language" },
+  { value: "computer_science", label: "Computer Science" },
+  { value: "art", label: "Art" },
+  { value: "music", label: "Music" },
+  { value: "physical_education", label: "Physical Education" },
+  { value: "other", label: "Other" },
+]
 
 export default function GetStartedPage() {
   const { t } = useLanguage()
@@ -27,6 +46,9 @@ export default function GetStartedPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [currentStatus, setCurrentStatus] = useState<ProcessingStatusResponse | null>(null)
+  const [feedbackData, setFeedbackData] = useState<GetFeedbackResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -47,46 +69,122 @@ export default function GetStartedPage() {
       const droppedFile = e.dataTransfer.files[0]
       if (droppedFile.type.startsWith("video/")) {
         setFile(droppedFile)
+        setError(null)
+      } else {
+        setError("Please select a valid video file")
       }
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
+      const selectedFile = e.target.files[0]
+      if (selectedFile.type.startsWith("video/")) {
+        setFile(selectedFile)
+        setError(null)
+      } else {
+        setError("Please select a valid video file")
+      }
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file) return
+    
+    // Validation
+    if (!file) {
+      setError("Please select a video file")
+      return
+    }
+
+    if (!formData.subject) {
+      setError("Please select a subject")
+      return
+    }
+
+    if (!formData.lessonTheme.trim()) {
+      setError("Please enter a lesson theme")
+      return
+    }
 
     setIsProcessing(true)
     setUploadProgress(0)
+    setError(null)
 
-    // Simulate upload progress
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval)
-          return 90
-        }
-        return prev + Math.random() * 15
+    try {
+      console.log("Starting upload with data:", {
+        subject: formData.subject,
+        theme: formData.lessonTheme,
+        language: formData.videoLanguage
       })
-    }, 200)
 
-    // Simulate processing time
-    setTimeout(() => {
-      clearInterval(progressInterval)
+      // Upload video
+      setUploadProgress(10)
+      const uploadResponse = await apiService.uploadVideo(
+        file,
+        formData.subject,
+        formData.lessonTheme,
+        formData.videoLanguage,
+        formData.feedbackLanguage
+      )
+
+      console.log("Upload response:", uploadResponse)
+      setUploadProgress(30)
+      toast.success("Video uploaded successfully! Processing started...")
+
+      // Poll for status updates
+      const finalStatus = await apiService.pollStatus(
+        uploadResponse.id,
+        (status) => {
+          console.log("Status update:", status)
+          setCurrentStatus(status)
+          setUploadProgress(30 + (status.progress * 60)) // 30-90% based on progress
+        }
+      )
+
+      console.log("Final status:", finalStatus)
+
+      if (finalStatus.status === 'failed') {
+        throw new Error(finalStatus.error_message || 'Processing failed')
+      }
+
+      setUploadProgress(90)
+
+      // Get feedback results
+      const feedback = await apiService.getFeedback(uploadResponse.id)
+      console.log("Feedback response:", feedback)
+      setFeedbackData(feedback)
       setUploadProgress(100)
-      setTimeout(() => {
-        setIsProcessing(false)
-        setIsComplete(true)
-      }, 1000)
-    }, 3000)
+
+      toast.success("Analysis completed successfully!")
+      setIsComplete(true)
+
+    } catch (err) {
+      console.error('Error processing video:', err)
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during processing'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
-  if (isComplete) {
+  if (isComplete && feedbackData) {
+    // Language mapping from frontend to backend
+    const languageMap: { [key: string]: string } = {
+      'english': 'en',
+      'russian': 'ru', 
+      'tajik': 'tj'
+    }
+    
+    // Get the primary feedback (first one or matching the selected language)
+    const backendLanguage = languageMap[formData.feedbackLanguage] || 'en'
+    const primaryFeedback = feedbackData.feedbacks.find(f => f.language === backendLanguage) || feedbackData.feedbacks[0]
+    
+    console.log("Selected language:", formData.feedbackLanguage, "Backend language:", backendLanguage)
+    console.log("Available feedbacks:", feedbackData.feedbacks.map(f => f.language))
+    console.log("Primary feedback:", primaryFeedback)
+    
     return (
       <div className="pt-20 min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20">
         <div className="container mx-auto px-4 py-20">
@@ -106,7 +204,7 @@ export default function GetStartedPage() {
             </motion.div>
 
             <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-              {t("getStarted.form.success")}
+              Analysis Complete!
             </h1>
 
             <p className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
@@ -124,95 +222,116 @@ export default function GetStartedPage() {
                   <div className="space-y-4 mb-6">
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm">Teaching Effectiveness</span>
-                        <span className="text-sm font-bold">94%</span>
+                        <span className="text-sm">Teaching Quality</span>
+                        <span className="text-sm font-bold">{Math.round(primaryFeedback.teaching_quality_score * 10)}%</span>
                       </div>
                       <div className="w-full bg-white/20 rounded-full h-2">
-                        <div className="bg-white h-2 rounded-full" style={{ width: "94%" }}></div>
+                        <div 
+                          className="bg-white h-2 rounded-full" 
+                          style={{ width: `${primaryFeedback.teaching_quality_score * 10}%` }}
+                        ></div>
                       </div>
                     </div>
 
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm">Student Engagement</span>
-                        <span className="text-sm font-bold">89%</span>
+                        <span className="text-sm font-bold">{Math.round(primaryFeedback.student_engagement_score * 10)}%</span>
                       </div>
                       <div className="w-full bg-white/20 rounded-full h-2">
-                        <div className="bg-white h-2 rounded-full" style={{ width: "89%" }}></div>
+                        <div 
+                          className="bg-white h-2 rounded-full" 
+                          style={{ width: `${primaryFeedback.student_engagement_score * 10}%` }}
+                        ></div>
                       </div>
                     </div>
 
                     <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm">Content Delivery</span>
-                        <span className="text-sm font-bold">91%</span>
+                        <span className="text-sm">Overall Score</span>
+                        <span className="text-sm font-bold">{Math.round(primaryFeedback.overall_score * 10)}%</span>
                       </div>
                       <div className="w-full bg-white/20 rounded-full h-2">
-                        <div className="bg-white h-2 rounded-full" style={{ width: "91%" }}></div>
+                        <div 
+                          className="bg-white h-2 rounded-full" 
+                          style={{ width: `${primaryFeedback.overall_score * 10}%` }}
+                        ></div>
                       </div>
                     </div>
                   </div>
 
                   <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3">
                     <h4 className="font-semibold mb-2 text-sm">Key Insights</h4>
-                    <div className="space-y-1 text-xs">
-                      <div className="flex items-start space-x-2">
-                        <CheckCircle className="w-3 h-3 mt-0.5 text-green-300" />
-                        <span>Excellent pacing and clarity</span>
-                      </div>
-                      <div className="flex items-start space-x-2">
-                        <CheckCircle className="w-3 h-3 mt-0.5 text-green-300" />
-                        <span>Strong student interaction</span>
-                      </div>
-                      <div className="flex items-start space-x-2">
-                        <Play className="w-3 h-3 mt-0.5 text-yellow-300" />
-                        <span>Consider more visual aids</span>
-                      </div>
+                    <div className="space-y-1 text-xs max-h-20 overflow-y-auto">
+                      {primaryFeedback.strengths.split('. ').slice(0, 2).map((strength, index) => (
+                        <div key={index} className="flex items-start space-x-2">
+                          <CheckCircle className="w-3 h-3 mt-0.5 text-green-300 flex-shrink-0" />
+                          <span>{strength}</span>
+                        </div>
+                      ))}
+                      {primaryFeedback.areas_for_improvement.split('. ').slice(0, 1).map((improvement, index) => (
+                        <div key={`improvement-${index}`} className="flex items-start space-x-2">
+                          <Play className="w-3 h-3 mt-0.5 text-yellow-300 flex-shrink-0" />
+                          <span>{improvement}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               </DeviceMockup>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+            {/* Detailed Feedback Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
               <Card className="border-2 border-green-200 dark:border-green-800">
-                <CardContent className="p-6 text-center">
-                  <BarChart3 className="w-8 h-8 mx-auto mb-3 text-green-600" />
-                  <h3 className="font-semibold mb-2">Detailed Analytics</h3>
-                  <p className="text-sm text-muted-foreground">Comprehensive metrics and insights</p>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                    Strengths
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {primaryFeedback.strengths}
+                  </p>
                 </CardContent>
               </Card>
 
               <Card className="border-2 border-blue-200 dark:border-blue-800">
-                <CardContent className="p-6 text-center">
-                  <FileText className="w-8 h-8 mx-auto mb-3 text-blue-600" />
-                  <h3 className="font-semibold mb-2">Professional Report</h3>
-                  <p className="text-sm text-muted-foreground">Multilingual feedback document</p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-purple-200 dark:border-purple-800">
-                <CardContent className="p-6 text-center">
-                  <CheckCircle className="w-8 h-8 mx-auto mb-3 text-purple-600" />
-                  <h3 className="font-semibold mb-2">Action Items</h3>
-                  <p className="text-sm text-muted-foreground">Specific improvement recommendations</p>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Play className="w-5 h-5 mr-2 text-blue-600" />
+                    Areas for Improvement
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {primaryFeedback.areas_for_improvement}
+                  </p>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="mt-12 space-x-4">
+            <Card className="border-2 border-purple-200 dark:border-purple-800 mb-12">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <FileText className="w-5 h-5 mr-2 text-purple-600" />
+                  Specific Recommendations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {primaryFeedback.specific_recommendations}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
-                size="lg"
-                className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
-              >
-                <Download className="w-5 h-5 mr-2" />
-                Download Report
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
                 onClick={() => {
                   setIsComplete(false)
+                  setFeedbackData(null)
                   setFile(null)
                   setFormData({
                     subject: "",
@@ -221,8 +340,17 @@ export default function GetStartedPage() {
                     feedbackLanguage: "english",
                   })
                 }}
+                variant="outline"
+                size="lg"
+                className="px-8"
               >
                 Analyze Another Video
+              </Button>
+              <Button
+                size="lg"
+                className="px-8 bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700"
+              >
+                Download Report
               </Button>
             </div>
           </motion.div>
@@ -233,21 +361,33 @@ export default function GetStartedPage() {
 
   return (
     <div className="pt-20 min-h-screen bg-gradient-to-br from-blue-50 to-green-50 dark:from-blue-950/20 dark:to-green-950/20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
+      <div className="container mx-auto px-4 py-20">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="text-center mb-12"
+          className="max-w-4xl mx-auto text-center"
         >
+          {/* Header */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="w-24 h-24 mx-auto mb-8 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center"
+          >
+            <BarChart3 className="w-12 h-12 text-white" />
+          </motion.div>
+
           <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
             {t("getStarted.title")}
           </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">{t("getStarted.subtitle")}</p>
-        </motion.div>
 
-        <div className="max-w-4xl mx-auto">
-          <Card className="border-2 border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-300 shadow-xl">
+          <p className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
+            {t("")}
+          </p>
+
+          {/* Upload Form */}
+          <Card className="max-w-2xl mx-auto shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-2xl text-center">Upload Your Classroom Video</CardTitle>
             </CardHeader>
@@ -312,13 +452,21 @@ export default function GetStartedPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="subject">{t("getStarted.form.subject")}</Label>
-                    <Input
-                      id="subject"
+                    <Select
                       value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      placeholder="e.g., Mathematics, Physics, Literature"
-                      className="h-10 sm:h-12"
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, subject: value })}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select a subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUBJECT_OPTIONS.map((subject) => (
+                          <SelectItem key={subject.value} value={subject.value}>
+                            {subject.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -328,7 +476,7 @@ export default function GetStartedPage() {
                       value={formData.lessonTheme}
                       onChange={(e) => setFormData({ ...formData, lessonTheme: e.target.value })}
                       placeholder="e.g., Quadratic Equations, Photosynthesis"
-                      className="h-10 sm:h-12"
+                      className="h-12"
                     />
                   </div>
                 </div>
@@ -380,6 +528,44 @@ export default function GetStartedPage() {
                   </div>
                 </div>
 
+                {/* Error Display */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center space-x-2 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    <span className="text-red-700 dark:text-red-400">{error}</span>
+                  </motion.div>
+                )}
+
+                {/* Progress Display */}
+                {isProcessing && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {currentStatus?.current_task || "Processing video..."}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {Math.round(uploadProgress)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <motion.div
+                        className="bg-gradient-to-r from-blue-600 to-green-600 h-2 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${uploadProgress}%` }}
+                        transition={{ duration: 0.5 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* Submit Button */}
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="text-center">
                   <Button
@@ -391,37 +577,22 @@ export default function GetStartedPage() {
                     {isProcessing ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        {t("getStarted.form.processing")}
+                        {currentStatus?.current_task || "Processing..."}
                       </>
                     ) : (
                       <>
                         <FileVideo className="w-5 h-5 mr-2" />
-                        {t("getStarted.form.upload")}
+                        {formData.feedbackLanguage === 'english' ? 'Get Feedback' : 
+                         formData.feedbackLanguage === 'russian' ? 'Получить отзыв' : 
+                         'Баҳо гиред'}
                       </>
                     )}
                   </Button>
                 </motion.div>
-
-                {/* Progress Bar */}
-                {isProcessing && (
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                      <motion.div
-                        className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${uploadProgress}%` }}
-                        transition={{ duration: 0.5 }}
-                      />
-                    </div>
-                    <p className="text-center text-sm text-muted-foreground">
-                      Processing: {Math.round(uploadProgress)}%
-                    </p>
-                  </motion.div>
-                )}
               </form>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
       </div>
     </div>
   )
