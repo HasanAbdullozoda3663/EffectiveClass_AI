@@ -120,7 +120,7 @@ export function Footer() {
         </div>
 
         <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 EffectiveClass AI. All rights reserved.</p>
+          <p>&copy; Product by SNH AI Lab. All rights reserved.</p>
         </div>
       </div>
     </footer>
